@@ -13,7 +13,7 @@ export function createScatterplotLayer() {
 export function createGeoJsonLayer(data) {
   return new GeoJsonLayer({
     id: 'geojson-layer',
-    data: './Height_of_buildings.geojson',
+    data: data,
     stroked: true,
     filled: true,
     extruded: true,
