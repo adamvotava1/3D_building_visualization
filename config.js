@@ -6,13 +6,3 @@ export const INITIAL_VIEW_STATE = {
   bearing: 0,
   zoom: 15
 };
-export const OVERPASS_QUERY_TEMPLATE = (bbox) => `
-  [out:json];
-  (
-    relation[building](${bbox});
-    >;
-    way[building](${bbox});
-    >;
-  );
-  out;
-`;

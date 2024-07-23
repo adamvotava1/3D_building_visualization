@@ -1,14 +1,5 @@
-import { ScatterplotLayer, GeoJsonLayer } from '@deck.gl/layers';
+import { GeoJsonLayer } from '@deck.gl/layers';
 
-export function createScatterplotLayer() {
-  return new ScatterplotLayer({
-    id: 'scatterplot-layer',
-    getPosition: cafe => [cafe.lon, cafe.lat],
-    getRadius: 10,
-    getFillColor: [255, 140, 0],
-    radiusUnits: 'pixels',
-  });
-}
 
 export function createGeoJsonLayer(data) {
   return new GeoJsonLayer({
