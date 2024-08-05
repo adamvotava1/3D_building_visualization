@@ -4,18 +4,30 @@
     <meta charset='UTF-8' />
     <title>deck.gl example</title>
     <style>
-    #map {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-    }
+      #map {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+      }
+      #text-overlay {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background-color: rgba(255, 255, 255, 0.8);
+        padding: 10px;
+        border-radius: 5px;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        z-index: 1000;
+      }
     </style>
     <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v1.13.0/mapbox-gl.css' rel='stylesheet' />
   </head>
   <body>
     <div id="map"></div>
+    <div id="text-overlay"></div>
     <script type="module" src='main.js'></script>
   </body>
 </html>
