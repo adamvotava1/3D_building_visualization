@@ -5,23 +5,10 @@ import { createPolygonLayer } from './layers.js';
 import { load } from '@loaders.gl/core';
 import { ShapefileLoader } from '@loaders.gl/shapefile';
 import proj4 from 'proj4';
-import { LightingEffect, AmbientLight, DirectionalLight } from '@deck.gl/core';
+import { getBoundingBoxFromMap, createStatsCounter } from './utils.js';
 
 const map = initializeMap('map');
 const deckgl = new DeckOverlay({ layers: [] });
-
-const ambientLight = new AmbientLight({
-  color: [255, 255, 255],
-  intensity: 0.7
-});
-
-const directionalLight = new DirectionalLight({
-  color: [255, 255, 255],
-  intensity: 1,
-  direction: [-3, -3, -1]
-});
-
-const lightingEffect = new LightingEffect({ ambientLight, directionalLight });
 
 async function loadShapefile(url) {
   try {
@@ -31,10 +18,6 @@ async function loadShapefile(url) {
     }
     proj4.defs('SOURCE_CRS', rawData.prj);
     const reprojectPoint = proj4('SOURCE_CRS', 'EPSG:4326');
-    
-    const featureTypes = new Set(rawData.data.map(f => f.geometry?.type).filter(Boolean));
-    console.log(`Loaded ${rawData.data.length} features of types:`, Array.from(featureTypes));
-
     return {
       type: 'FeatureCollection',
       features: rawData.data.map(feature => ({
@@ -69,26 +52,45 @@ function reprojectGeometry(geometry, reprojectPoint) {
   }
 }
 
-function updateLayers(buildingsData, terrainData) {
-  if (buildingsData && terrainData) {
+function updateLayers(buildingsData, bridgesData) {
+  if (buildingsData && bridgesData) {
     deckgl.setProps({
       layers: [
-        createPolygonLayer(terrainData, 'terrain-layer', [139, 69, 19]),
-        createPolygonLayer(buildingsData, 'buildings-layer', [112, 156, 137])
-      ],
-      effects: [lightingEffect]
+        createPolygonLayer(buildingsData, 'buildings-layer'),
+        createPolygonLayer(bridgesData, 'bridges-layer') // Orange color for bridges
+      ]
     });
   } else {
     console.error('Failed to load shapefile data');
   }
 }
 
+function animateCamera() {
+  let time = 0;
+  function animate() {
+    time += 0.01; // Adjust this value to change the speed
+    // Calculate new pitch and bearing
+    const newPitch = 30 + Math.sin(time) * 20; // Pitch will oscillate between 10 and 50 degrees
+    const newBearing = (time * 30) % 360; // Bearing will rotate continuously
+    map.easeTo({
+      pitch: newPitch,
+      bearing: newBearing,
+      duration: 100, // Adjust this value to change the smoothness
+      easing: (t) => t
+    });
+    requestAnimationFrame(animate);
+  }
+  animate();
+}
+
 map.on('load', async () => {
-  const [buildingsData, terrainData] = await Promise.all([
-    loadShapefile('Krav_6-9/BD3_Krav69.shp'),
-    loadShapefile('Krav_2-9_teren/TER_Krav_2-9_shp.shp')
-  ]);
-  updateLayers(buildingsData, terrainData);
+  const buildingsData = await loadShapefile('Krav_6-9/BD3_Krav69.shp');
+  const bridgesData = await loadShapefile('mosty_shp/mosty.shp');
+  updateLayers(buildingsData, bridgesData);
+  const updateStats = createStatsCounter(map);
+  updateStats();
+  // Start the camera movement after the map has loaded
+  //animateCamera();
 });
 
 map.addControl(deckgl);
