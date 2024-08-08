@@ -1,5 +1,6 @@
 import { MapboxOverlay as DeckOverlay } from '@deck.gl/mapbox';
 import mapboxgl from 'mapbox-gl';
+import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder';
 import osmtogeojson from 'osmtogeojson';
 import { initializeMap } from './mapSetup.js';
 import { queryOverpass } from './api.js';
@@ -24,36 +25,35 @@ function debounce(func, delay) {
   };
 }
 
-// Maximum area constraint (in square kilometers)
-const MAX_AREA = 2;
+const MAX_QUERY_AREA = 10; // Maximum area for querying data
 
-// Function to update data
 async function updateData() {
   try {
-    // Get bounding box from map
     const bbox = getBoundingBoxFromMap(map);
 
-    // Calculate area of bounding box (approximate)
-    const area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) * 111 * 111;
+    const latDiff = Math.abs(bbox.array[2] - bbox.array[0]);
+    const lonDiff = Math.abs(bbox.array[3] - bbox.array[1]);
+    const area = latDiff * lonDiff * 111 * 111;
 
-    if (area > MAX_AREA) {
-      updateTextOverlay(`Area too large (${area.toFixed(2)} km²). Maximum allowed: ${MAX_AREA} km²`);
+    console.log(`Current area: ${area.toFixed(2)} km²`);
+    console.log(`MAX_QUERY_AREA: ${MAX_QUERY_AREA} km²`);
+
+    if (area > MAX_QUERY_AREA) {
+      updateTextOverlay(`Please zoom in to view building data. Current area: ${area.toFixed(2)} km²`);
       return;
     }
 
     updateTextOverlay('Loading data...');
 
     // Construct query using template
-    const query = OVERPASS_QUERY_TEMPLATE(bbox);
-
+    const query = OVERPASS_QUERY_TEMPLATE(bbox.string);
     // Fetch and process data
     const data = await queryOverpass(query);
     const buildings = osmtogeojson(data);
-
+    
     // Create and set new layer
     const geoJsonLayer = createGeoJsonLayer(buildings);
     deckgl.setProps({ layers: [geoJsonLayer] });
-
     updateTextOverlay(`Loaded ${buildings.features.length} features`);
   } catch (error) {
     console.error('Error loading map data:', error);
@@ -62,7 +62,7 @@ async function updateData() {
 }
 
 // Debounced update function
-const debouncedUpdateData = debounce(updateData, 500);
+const debouncedUpdateData = debounce(updateData, 1000);
 
 map.on('load', function() {
   // Initial data load
@@ -74,6 +74,13 @@ map.on('load', function() {
 
 // Add controls
 map.addControl(deckgl);
+
+map.addControl(
+  new MapboxGeocoder({
+      accessToken: mapboxgl.accessToken,
+      mapboxgl: mapboxgl
+  })
+);
 map.addControl(new mapboxgl.NavigationControl());
 
 function updateTextOverlay(text) {

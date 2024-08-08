@@ -12,6 +12,7 @@
     "vite": "^5.0.8"
   },
   "dependencies": {
+    "@mapbox/mapbox-gl-geocoder": "^5.0.2",
     "deck.gl": "^9.0.23",
     "mapbox-gl": "^3.1.2",
     "osmtogeojson": "^3.0.0-beta.5"
