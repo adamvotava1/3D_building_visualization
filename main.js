@@ -84,7 +84,7 @@ function animateCamera() {
 }
 
 map.on('load', async () => {
-  const buildingsData = await loadShapefile('Krav_6-9/BD3_Krav69.shp');
+  const buildingsData = await loadShapefile('Prah_2-1/BD3_Prah21.shp');
   const bridgesData = await loadShapefile('mosty_shp/mosty.shp');
   updateLayers(buildingsData, bridgesData);
   const updateStats = createStatsCounter(map);

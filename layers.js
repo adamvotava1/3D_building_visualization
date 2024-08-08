@@ -21,7 +21,8 @@ export function createPolygonLayer(data, id) {
     extruded: true,
     getPolygon: d => d.geometry.coordinates[0],
     getElevation: 0,
-    getFillColor: () => getRandomColor(), // Use random color for each feature
+    getFillColor: () => [0, 255, 0],
+    //getFillColor: () => getRandomColor(), // Use random color for each feature
     getLineColor: [0, 0, 0],
     parameters: {
       cullFace: false
