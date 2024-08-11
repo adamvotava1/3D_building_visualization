@@ -7,17 +7,27 @@ import { ShapefileLoader } from '@loaders.gl/shapefile';
 import proj4 from 'proj4';
 import { getBoundingBoxFromMap, createStatsCounter } from './utils.js';
 
+// Inicializace mapy
 const map = initializeMap('map');
 const deckgl = new DeckOverlay({ layers: [] });
 
+/**
+ * Načte shapefile z dané URL a převede jej na GeoJSON
+ * @param {string} url - URL souboru shapefile
+ * @returns {Object|null} GeoJSON objekt nebo null v případě chyby
+ */
 async function loadShapefile(url) {
   try {
     const rawData = await load(url, ShapefileLoader);
     if (!rawData.prj || !Array.isArray(rawData.data)) {
-      throw new Error('Invalid shapefile structure');
+      throw new Error('Neplatná struktura shapefile');
     }
+    
+    // Nastavení projekce a vytvoření funkce pro převod souřadnic
     proj4.defs('SOURCE_CRS', rawData.prj);
     const reprojectPoint = proj4('SOURCE_CRS', 'EPSG:4326');
+    
+    // Převod dat na GeoJSON
     return {
       type: 'FeatureCollection',
       features: rawData.data.map(feature => ({
@@ -26,11 +36,17 @@ async function loadShapefile(url) {
       }))
     };
   } catch (error) {
-    console.error('Error loading shapefile:', error);
+    console.error('Chyba při načítání shapefile:', error);
     return null;
   }
 }
 
+/**
+ * Převede geometrii z původní projekce do WGS84
+ * @param {Object} geometry - Geometrie k převodu
+ * @param {Function} reprojectPoint - Funkce pro převod jednotlivých bodů
+ * @returns {Object} Převedená geometrie
+ */
 function reprojectGeometry(geometry, reprojectPoint) {
   const reprojectCoords = coords => coords.map(ring =>
     ring.filter(coord => coord.every(Number.isFinite))
@@ -47,51 +63,39 @@ function reprojectGeometry(geometry, reprojectPoint) {
     case 'MultiPolygon':
       return { ...geometry, coordinates: geometry.coordinates.map(reprojectCoords) };
     default:
-      console.warn('Unsupported geometry type:', geometry.type);
+      console.warn('Nepodporovaný typ geometrie:', geometry.type);
       return geometry;
   }
 }
 
-function updateLayers(buildingsData, bridgesData) {
-  if (buildingsData && bridgesData) {
+/**
+ * Aktualizuje polygonLayer
+ * @param {Object} shapefileData - Data ze shapefile
+ */
+function updateLayers(shapefileData) {
+  if (shapefileData) {
     deckgl.setProps({
       layers: [
-        createPolygonLayer(buildingsData, 'buildings-layer'),
-        createPolygonLayer(bridgesData, 'bridges-layer') // Orange color for bridges
+        createPolygonLayer(shapefileData, 'shapefile-layer')
       ]
     });
   } else {
-    console.error('Failed to load shapefile data');
+    console.error('Nepodařilo se načíst data shapefile');
   }
 }
 
-function animateCamera() {
-  let time = 0;
-  function animate() {
-    time += 0.01; // Adjust this value to change the speed
-    // Calculate new pitch and bearing
-    const newPitch = 30 + Math.sin(time) * 20; // Pitch will oscillate between 10 and 50 degrees
-    const newBearing = (time * 30) % 360; // Bearing will rotate continuously
-    map.easeTo({
-      pitch: newPitch,
-      bearing: newBearing,
-      duration: 100, // Adjust this value to change the smoothness
-      easing: (t) => t
-    });
-    requestAnimationFrame(animate);
-  }
-  animate();
-}
 
+
+// Načtení dat a inicializace mapy po jejím načtení
 map.on('load', async () => {
-  const buildingsData = await loadShapefile('Prah_2-1/BD3_Prah21.shp');
-  const bridgesData = await loadShapefile('mosty_shp/mosty.shp');
-  updateLayers(buildingsData, bridgesData);
+  const shapefileUrl = ''; // Zde je třeba doplnit cestu k souboru
+  const shapefileData = await loadShapefile(shapefileUrl);
+  updateLayers(shapefileData);
+ 
   const updateStats = createStatsCounter(map);
   updateStats();
-  // Start the camera movement after the map has loaded
-  //animateCamera();
 });
 
+// Přidání ovládacích prvků do mapy
 map.addControl(deckgl);
 map.addControl(new mapboxgl.NavigationControl());
