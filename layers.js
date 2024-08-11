@@ -1,5 +1,22 @@
 import { GeoJsonLayer } from '@deck.gl/layers';
 
+// Definice barev pro různé typy amenities
+const AMENITY_COLORS = {
+  place_of_worship: [0, 0, 255, 255],  // Modrá
+  parking: [0, 255, 0, 255],           // Zelená
+  hospital: [255, 0, 0, 255],          // Červená
+  default: [150, 150, 150, 255]        // Šedá (výchozí)
+};
+
+// Konstanty pro výpočet výšky budov
+const DEFAULT_HEIGHT = 3;
+const LEVEL_HEIGHT = 3;
+
+/**
+ * Vytvoří vrstvu GeoJsonLayer pro zobrazení budov na mapě.
+ * @param {Object} data - GeoJSON data obsahující informace o budovách.
+ * @returns {GeoJsonLayer} Nová instance GeoJsonLayer.
+ */
 export function createGeoJsonLayer(data) {
   return new GeoJsonLayer({
     id: 'geojson-layer',
@@ -8,33 +25,38 @@ export function createGeoJsonLayer(data) {
     filled: true,
     extruded: true,
     lineWidthMinPixels: 2,
-    getFillColor: e => {
-      let fillColor = [150, 150, 150, 255];
-      if (e.properties && e.properties.amenity) {
-        switch (e.properties.amenity) {
-          case 'place_of_worship':
-            fillColor = [0, 0, 255, 255];
-            break;
-          case 'parking':
-            fillColor = [0, 255, 0, 255]; // Green color
-            break;
-          case 'hospital':
-            fillColor = [255, 0, 0, 255]; // Red color
-            break;
-          default:
-            break;
-        }
-      }
-      return fillColor;
-    },
-    getElevation: e => {
-      if (e.properties && e.properties.hasOwnProperty('building:levels')) {
-        return e.properties['building:levels'] * 3;
-      } else if (e.properties && e.properties.hasOwnProperty('height')) {
-        return e.properties.height * 1;
-      } else {
-        return 3;
-      }
-    }
+    getFillColor: getFillColorForFeature,
+    getElevation: getElevationForFeature
   });
+}
+
+/**
+ * Určí barvu výplně pro daný prvek na základě jeho vlastností.
+ * @param {Object} feature - GeoJSON prvek reprezentující budovu.
+ * @returns {Array} RGBA barva jako pole čtyř čísel.
+ */
+function getFillColorForFeature(feature) {
+  if (feature.properties && feature.properties.amenity) {
+    return AMENITY_COLORS[feature.properties.amenity] || AMENITY_COLORS.default;
+  }
+  return AMENITY_COLORS.default;
+}
+
+/**
+ * Určí výšku budovy na základě jejích vlastností.
+ * @param {Object} feature - GeoJSON prvek reprezentující budovu.
+ * @returns {number} Výška budovy v metrech.
+ */
+function getElevationForFeature(feature) {
+  if (!feature.properties) return DEFAULT_HEIGHT;
+
+  if (feature.properties['building:levels']) {
+    return feature.properties['building:levels'] * LEVEL_HEIGHT;
+  } 
+  
+  if (feature.properties.height) {
+    return feature.properties.height;
+  }
+
+  return DEFAULT_HEIGHT;
 }

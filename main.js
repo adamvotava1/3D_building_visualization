@@ -5,85 +5,80 @@ import osmtogeojson from 'osmtogeojson';
 import { initializeMap } from './mapSetup.js';
 import { queryOverpass } from './api.js';
 import { createGeoJsonLayer } from './layers.js';
-import { getBoundingBoxFromMap } from './utils.js';
+import { getBoundingBoxFromMap, calculateArea } from './utils.js';
 import { OVERPASS_QUERY_TEMPLATE } from './config.js';
 
-// Initialize map
+// Inicializace mapy
 const map = initializeMap('map');
 
-// Initialize DeckGL overlay
-const deckgl = new DeckOverlay({
-  map
-});
+// Inicializace překrytí DeckGL
+const deckgl = new DeckOverlay({ map });
 
-// Debounce function
-function debounce(func, delay) {
-  let timeoutId;
-  return function (...args) {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func.apply(this, args), delay);
-  };
-}
+// Maximální plocha pro dotazování dat (v km²)
+const MAX_QUERY_AREA = 10;
 
-const MAX_QUERY_AREA = 10; // Maximum area for querying data
+// Časovač pro řízení načítání dat
+let cooldownTimer = null;
 
-async function updateData() {
+const COOLDOWN_PERIOD = 1000; // 1000ms cooldown po zastavení pohybu
+
+// Aktualizace dat na mapě
+const updateData = async () => {
   try {
     const bbox = getBoundingBoxFromMap(map);
-
-    const latDiff = Math.abs(bbox.array[2] - bbox.array[0]);
-    const lonDiff = Math.abs(bbox.array[3] - bbox.array[1]);
-    const area = latDiff * lonDiff * 111 * 111;
-
-    console.log(`Current area: ${area.toFixed(2)} km²`);
-    console.log(`MAX_QUERY_AREA: ${MAX_QUERY_AREA} km²`);
+    const area = calculateArea(bbox);
 
     if (area > MAX_QUERY_AREA) {
-      updateTextOverlay(`Please zoom in to view building data. Current area: ${area.toFixed(2)} km²`);
+      updateTextOverlay(`Pro zobrazení dat o budovách přibližte mapu. Aktuální plocha: ${area.toFixed(2)} km²`);
       return;
     }
 
-    updateTextOverlay('Loading data...');
+    updateTextOverlay('Načítání dat...');
 
-    // Construct query using template
     const query = OVERPASS_QUERY_TEMPLATE(bbox.string);
-    // Fetch and process data
+
     const data = await queryOverpass(query);
+
+    if (!data || !data.elements) {
+      throw new Error('Received invalid data from Overpass API');
+    }
+
     const buildings = osmtogeojson(data);
-    
-    // Create and set new layer
+   
     const geoJsonLayer = createGeoJsonLayer(buildings);
     deckgl.setProps({ layers: [geoJsonLayer] });
-    updateTextOverlay(`Loaded ${buildings.features.length} features`);
+
+    updateTextOverlay(`Načteno ${buildings.features.length} prvků`);
   } catch (error) {
-    console.error('Error loading map data:', error);
-    updateTextOverlay('Error loading data. Please try again.');
+    console.error('Detailní chyba při načítání dat mapy:', error);
+    updateTextOverlay(`Chyba při načítání dat: ${error.message}. Zkuste to prosím znovu.`);
   }
-}
+};
 
-// Debounced update function
-const debouncedUpdateData = debounce(updateData, 1000);
+// Funkce pro resetování a nastavení časovače cooldown
+const resetCooldownTimer = () => {
+  clearTimeout(cooldownTimer);
+  cooldownTimer = setTimeout(updateData, COOLDOWN_PERIOD);
+};
 
-map.on('load', function() {
-  // Initial data load
-  updateData();
-
-  // Update data on map move end
-  map.on('moveend', debouncedUpdateData);
+// Události mapy
+map.on('load', () => {
+  updateData(); // Počáteční načtení dat
 });
 
-// Add controls
-map.addControl(deckgl);
+map.on('movestart', () => {
+  clearTimeout(cooldownTimer);
+});
 
-map.addControl(
-  new MapboxGeocoder({
-      accessToken: mapboxgl.accessToken,
-      mapboxgl: mapboxgl
-  })
-);
+map.on('moveend', resetCooldownTimer);
+
+// Přidání ovládacích prvků
+map.addControl(deckgl);
+map.addControl(new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl }));
 map.addControl(new mapboxgl.NavigationControl());
 
-function updateTextOverlay(text) {
+// Aktualizace textu
+const updateTextOverlay = (text) => {
   const overlay = document.getElementById('text-overlay');
   overlay.textContent = text;
-}
+};
